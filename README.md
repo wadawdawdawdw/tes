@@ -19,6 +19,9 @@ local fovRadius = 120
 local bypass = false
 local lockedTarget = nil
 
+-- FORÇA DO AIMBOT
+local aimStrength = 0.15 -- quanto maior, mais forte (0.05 a 1)
+
 -- ESP
 local espEnabled = false
 local espObjects = {}
@@ -30,7 +33,7 @@ local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
 ScreenGui.Name = "StuartHUB"
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 420)
+MainFrame.Size = UDim2.new(0, 320, 0, 470)
 MainFrame.Position = UDim2.new(0.35, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 MainFrame.Active = true
@@ -67,13 +70,15 @@ end
 -- =========================
 -- BOTÕES
 -- =========================
-local AimBtn    = createButton("AIMBOT [OFF]", 60)
-local FovBtn    = createButton("FOV CHECK [OFF]", 105)
-local PlusBtn   = createButton("AUMENTAR CÍRCULO", 150)
-local MinusBtn  = createButton("DIMINUIR CÍRCULO", 195)
-local DeadBtn   = createButton("IGNORAR MORTOS [OFF]", 240)
-local EspBtn    = createButton("ESP TRONCO [OFF]", 285)
-local BypassBtn = createButton("BYPASS", 330)
+local AimBtn      = createButton("AIMBOT [OFF]", 60)
+local FovBtn      = createButton("FOV CHECK [OFF]", 105)
+local PlusBtn     = createButton("AUMENTAR CÍRCULO", 150)
+local MinusBtn    = createButton("DIMINUIR CÍRCULO", 195)
+local DeadBtn     = createButton("IGNORAR MORTOS [OFF]", 240)
+local EspBtn      = createButton("ESP TRONCO [OFF]", 285)
+local WeakAimBtn  = createButton("AIMBOT FRACO", 330)
+local StrongAimBtn= createButton("AIMBOT FORTE", 375)
+local BypassBtn   = createButton("BYPASS", 420)
 BypassBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
 
 -- =========================
@@ -121,7 +126,7 @@ local function getClosestPlayer()
 end
 
 -- =========================
--- ESP FUNÇÕES
+-- ESP
 -- =========================
 local function createESP(player)
 	if player == LocalPlayer then return end
@@ -131,7 +136,6 @@ local function createESP(player)
 	if not hrp or espObjects[player] then return end
 
 	local box = Instance.new("BoxHandleAdornment")
-	box.Name = "ESP_BOX"
 	box.Adornee = hrp
 	box.Size = Vector3.new(2,3,1)
 	box.Color3 = Color3.fromRGB(255,0,0)
@@ -161,15 +165,6 @@ local function updateESP()
 end
 
 Players.PlayerRemoving:Connect(removeESP)
-
-Players.PlayerAdded:Connect(function(plr)
-	plr.CharacterAdded:Connect(function()
-		task.wait(1)
-		if espEnabled then
-			createESP(plr)
-		end
-	end)
-end)
 
 -- =========================
 -- INPUT
@@ -221,6 +216,16 @@ EspBtn.MouseButton1Click:Connect(function()
 	updateESP()
 end)
 
+-- Aimbot fraco
+WeakAimBtn.MouseButton1Click:Connect(function()
+	aimStrength = math.clamp(aimStrength - 0.05, 0.05, 1)
+end)
+
+-- Aimbot forte
+StrongAimBtn.MouseButton1Click:Connect(function()
+	aimStrength = math.clamp(aimStrength + 0.05, 0.05, 1)
+end)
+
 BypassBtn.MouseButton1Click:Connect(function()
 	bypass = true
 	ScreenGui.Enabled = false
@@ -245,11 +250,8 @@ RunService.RenderStepped:Connect(function()
 	FovCircle.Radius = fovRadius
 
 	if aimbotEnabled and holdingRightClick and lockedTarget then
-		if lockedTarget.Parent and lockedTarget.Parent:FindFirstChild("Humanoid") then
-			local hum = lockedTarget.Parent.Humanoid
-			if not (ignoreDead and hum.Health <= 0) then
-				Camera.CFrame = CFrame.new(Camera.CFrame.Position, lockedTarget.Position)
-			end
-		end
+		local currentCF = Camera.CFrame
+		local targetCF = CFrame.new(currentCF.Position, lockedTarget.Position)
+		Camera.CFrame = currentCF:Lerp(targetCF, aimStrength)
 	end
 end)
