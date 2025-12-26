@@ -1,5 +1,4 @@
---// STUART HUB - Aimbot + FOV
---// UI MELHORADA + IMAGEM NO CANTO + BYPASS
+--// STUART HUB - Aimbot + FOV + HP ESP
 --// LocalScript | StarterPlayer > StarterPlayerScripts
 
 -- SERVICES
@@ -20,7 +19,11 @@ local holdingRightClick = false
 local fovRadius = 120
 local lockedTarget = nil
 local aimStrength = 0.15
-local scriptDisabled = false -- para o BYPASS
+local scriptDisabled = false
+
+-- HP ESP
+local hpEspEnabled = false
+local healthBars = {}
 
 -- =========================
 -- UI
@@ -30,7 +33,7 @@ ScreenGui.Name = "StuartHUB"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 430)
+MainFrame.Size = UDim2.new(0, 320, 0, 470)
 MainFrame.Position = UDim2.new(0.35, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 MainFrame.Active = true
@@ -38,19 +41,16 @@ MainFrame.Draggable = true
 MainFrame.BorderSizePixel = 0
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0,12)
 
--- BORDA NEON
 local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Thickness = 2
 Stroke.Color = Color3.fromRGB(0,255,255)
 
--- LOGO
 local Logo = Instance.new("ImageLabel", MainFrame)
 Logo.Size = UDim2.new(0,40,0,40)
 Logo.Position = UDim2.new(0,10,0,5)
 Logo.BackgroundTransparency = 1
 Logo.Image = "rbxassetid://13799217063"
 
--- TÍTULO
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1,0,0,50)
 Title.Text = "Stuart HUB"
@@ -72,12 +72,10 @@ local function createButton(text, posY)
 	btn.TextColor3 = Color3.new(1,1,1)
 	btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
 	btn.BorderSizePixel = 0
-
 	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
 	local s = Instance.new("UIStroke", btn)
 	s.Thickness = 1
 	s.Color = Color3.fromRGB(80,80,80)
-
 	return btn
 end
 
@@ -89,7 +87,8 @@ local MinusBtn     = createButton("DIMINUIR CÍRCULO", 195)
 local DeadBtn      = createButton("IGNORAR MORTOS [OFF]", 240)
 local WeakAimBtn   = createButton("AIMBOT FRACO", 285)
 local StrongAimBtn = createButton("AIMBOT FORTE", 330)
-local BypassBtn    = createButton("BYPASS", 375)
+local HpEspBtn     = createButton("HP ESP [OFF]", 375)
+local BypassBtn    = createButton("BYPASS", 420)
 BypassBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
 
 -- =========================
@@ -132,6 +131,59 @@ local function getClosestPlayer()
 end
 
 -- =========================
+-- HP ESP FUNÇÕES
+-- =========================
+local function createHealthBar(player)
+	if player == LocalPlayer or not player.Character then return end
+
+	local char = player.Character
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not hum or not root then return end
+
+	local bb = Instance.new("BillboardGui")
+	bb.Size = UDim2.new(0,6,0,50)
+	bb.StudsOffset = Vector3.new(2.5,0,0)
+	bb.AlwaysOnTop = true
+	bb.Adornee = root
+	bb.Parent = root
+
+	local bg = Instance.new("Frame", bb)
+	bg.Size = UDim2.new(1,0,1,0)
+	bg.BackgroundColor3 = Color3.fromRGB(25,25,25)
+	bg.BorderSizePixel = 0
+
+	local bar = Instance.new("Frame", bg)
+	bar.AnchorPoint = Vector2.new(0,1)
+	bar.Position = UDim2.new(0,0,1,0)
+	bar.Size = UDim2.new(1,0,1,0)
+	bar.BorderSizePixel = 0
+
+	local function update()
+		local hp = hum.Health / hum.MaxHealth
+		bar.Size = UDim2.new(1,0,hp,0)
+		if hp > 0.6 then
+			bar.BackgroundColor3 = Color3.fromRGB(0,255,0)
+		elseif hp > 0.3 then
+			bar.BackgroundColor3 = Color3.fromRGB(255,170,0)
+		else
+			bar.BackgroundColor3 = Color3.fromRGB(255,0,0)
+		end
+	end
+
+	hum.HealthChanged:Connect(update)
+	update()
+	healthBars[player] = bb
+end
+
+local function removeHealthBars()
+	for _,v in pairs(healthBars) do
+		if v then v:Destroy() end
+	end
+	healthBars = {}
+end
+
+-- =========================
 -- INPUT
 -- =========================
 UserInputService.InputBegan:Connect(function(input)
@@ -143,7 +195,6 @@ UserInputService.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-	if scriptDisabled then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		holdingRightClick = false
 		lockedTarget = nil
@@ -154,50 +205,52 @@ end)
 -- BOTÕES
 -- =========================
 AimBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	aimbotEnabled = not aimbotEnabled
 	AimBtn.Text = "AIMBOT ["..(aimbotEnabled and "ON" or "OFF").."]"
 end)
 
 FovBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	fovEnabled = not fovEnabled
 	FovBtn.Text = "FOV CHECK ["..(fovEnabled and "ON" or "OFF").."]"
 	FovCircle.Visible = fovEnabled
 end)
 
 PlusBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	fovRadius += 10
 end)
 
 MinusBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	fovRadius = math.max(30, fovRadius - 10)
 end)
 
 DeadBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	ignoreDead = not ignoreDead
 	DeadBtn.Text = "IGNORAR MORTOS ["..(ignoreDead and "ON" or "OFF").."]"
 end)
 
 WeakAimBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	aimStrength = math.clamp(aimStrength - 0.05, 0.05, 1)
 end)
 
 StrongAimBtn.MouseButton1Click:Connect(function()
-	if scriptDisabled then return end
 	aimStrength = math.clamp(aimStrength + 0.05, 0.05, 1)
+end)
+
+HpEspBtn.MouseButton1Click:Connect(function()
+	hpEspEnabled = not hpEspEnabled
+	HpEspBtn.Text = "HP ESP ["..(hpEspEnabled and "ON" or "OFF").."]"
+	if hpEspEnabled then
+		for _,p in pairs(Players:GetPlayers()) do
+			createHealthBar(p)
+		end
+	else
+		removeHealthBars()
+	end
 end)
 
 BypassBtn.MouseButton1Click:Connect(function()
 	scriptDisabled = true
-	aimbotEnabled = false
-	fovEnabled = false
-	holdingRightClick = false
-	lockedTarget = nil
+	removeHealthBars()
 	FovCircle.Visible = false
 	ScreenGui.Enabled = false
 end)
@@ -207,18 +260,20 @@ end)
 -- =========================
 RunService.RenderStepped:Connect(function()
 	if scriptDisabled then return end
-
-	FovCircle.Position = Vector2.new(
-		Camera.ViewportSize.X / 2,
-		Camera.ViewportSize.Y / 2
-	)
+	FovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 	FovCircle.Radius = fovRadius
-
 	if aimbotEnabled and holdingRightClick and lockedTarget then
 		local cf = Camera.CFrame
-		Camera.CFrame = cf:Lerp(
-			CFrame.new(cf.Position, lockedTarget.Position),
-			aimStrength
-		)
+		Camera.CFrame = cf:Lerp(CFrame.new(cf.Position, lockedTarget.Position), aimStrength)
 	end
+end)
+
+-- Respawn players
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function()
+		task.wait(1)
+		if hpEspEnabled then
+			createHealthBar(p)
+		end
+	end)
 end)
