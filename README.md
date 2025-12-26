@@ -1,5 +1,5 @@
---// STUART HUB - Aimbot + FOV + ESP
---// UI MELHORADA + IMAGEM NO CANTO
+--// STUART HUB - Aimbot + FOV
+--// UI MELHORADA + IMAGEM NO CANTO + BYPASS
 --// LocalScript | StarterPlayer > StarterPlayerScripts
 
 -- SERVICES
@@ -20,10 +20,7 @@ local holdingRightClick = false
 local fovRadius = 120
 local lockedTarget = nil
 local aimStrength = 0.15
-
--- ESP
-local espEnabled = false
-local espObjects = {}
+local scriptDisabled = false -- para o BYPASS
 
 -- =========================
 -- UI
@@ -33,7 +30,7 @@ ScreenGui.Name = "StuartHUB"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 470)
+MainFrame.Size = UDim2.new(0, 320, 0, 430)
 MainFrame.Position = UDim2.new(0.35, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 MainFrame.Active = true
@@ -46,7 +43,7 @@ local Stroke = Instance.new("UIStroke", MainFrame)
 Stroke.Thickness = 2
 Stroke.Color = Color3.fromRGB(0,255,255)
 
--- LOGO (IMAGEM)
+-- LOGO
 local Logo = Instance.new("ImageLabel", MainFrame)
 Logo.Size = UDim2.new(0,40,0,40)
 Logo.Position = UDim2.new(0,10,0,5)
@@ -90,9 +87,10 @@ local FovBtn       = createButton("FOV CHECK [OFF]", 105)
 local PlusBtn      = createButton("AUMENTAR CÍRCULO", 150)
 local MinusBtn     = createButton("DIMINUIR CÍRCULO", 195)
 local DeadBtn      = createButton("IGNORAR MORTOS [OFF]", 240)
-local EspBtn       = createButton("ESP TRONCO [OFF]", 285)
-local WeakAimBtn   = createButton("AIMBOT FRACO", 330)
-local StrongAimBtn = createButton("AIMBOT FORTE", 375)
+local WeakAimBtn   = createButton("AIMBOT FRACO", 285)
+local StrongAimBtn = createButton("AIMBOT FORTE", 330)
+local BypassBtn    = createButton("BYPASS", 375)
+BypassBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
 
 -- =========================
 -- FOV CIRCLE
@@ -113,6 +111,7 @@ local function isAlive(player)
 end
 
 local function getClosestPlayer()
+	if scriptDisabled then return nil end
 	local closest, shortest = nil, math.huge
 	for _,plr in pairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
@@ -133,36 +132,10 @@ local function getClosestPlayer()
 end
 
 -- =========================
--- ESP
--- =========================
-local function clearESP(player)
-	if espObjects[player] then
-		espObjects[player]:Destroy()
-		espObjects[player] = nil
-	end
-end
-
-local function applyESP(player)
-	if not espEnabled or player == LocalPlayer then return end
-	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp then return end
-	clearESP(player)
-
-	local box = Instance.new("BoxHandleAdornment")
-	box.Adornee = hrp
-	box.Size = Vector3.new(2,3,1)
-	box.Color3 = Color3.fromRGB(255,0,0)
-	box.Transparency = 0.3
-	box.AlwaysOnTop = true
-	box.Parent = hrp
-
-	espObjects[player] = box
-end
-
--- =========================
 -- INPUT
 -- =========================
 UserInputService.InputBegan:Connect(function(input)
+	if scriptDisabled then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		holdingRightClick = true
 		lockedTarget = getClosestPlayer()
@@ -170,6 +143,7 @@ UserInputService.InputBegan:Connect(function(input)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
+	if scriptDisabled then return end
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		holdingRightClick = false
 		lockedTarget = nil
@@ -180,49 +154,60 @@ end)
 -- BOTÕES
 -- =========================
 AimBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	aimbotEnabled = not aimbotEnabled
 	AimBtn.Text = "AIMBOT ["..(aimbotEnabled and "ON" or "OFF").."]"
 end)
 
 FovBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	fovEnabled = not fovEnabled
 	FovBtn.Text = "FOV CHECK ["..(fovEnabled and "ON" or "OFF").."]"
 	FovCircle.Visible = fovEnabled
 end)
 
 PlusBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	fovRadius += 10
 end)
 
 MinusBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	fovRadius = math.max(30, fovRadius - 10)
 end)
 
 DeadBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	ignoreDead = not ignoreDead
 	DeadBtn.Text = "IGNORAR MORTOS ["..(ignoreDead and "ON" or "OFF").."]"
 end)
 
-EspBtn.MouseButton1Click:Connect(function()
-	espEnabled = not espEnabled
-	EspBtn.Text = "ESP TRONCO ["..(espEnabled and "ON" or "OFF").."]"
-	for _,plr in pairs(Players:GetPlayers()) do
-		if espEnabled then applyESP(plr) else clearESP(plr) end
-	end
-end)
-
 WeakAimBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	aimStrength = math.clamp(aimStrength - 0.05, 0.05, 1)
 end)
 
 StrongAimBtn.MouseButton1Click:Connect(function()
+	if scriptDisabled then return end
 	aimStrength = math.clamp(aimStrength + 0.05, 0.05, 1)
+end)
+
+BypassBtn.MouseButton1Click:Connect(function()
+	scriptDisabled = true
+	aimbotEnabled = false
+	fovEnabled = false
+	holdingRightClick = false
+	lockedTarget = nil
+	FovCircle.Visible = false
+	ScreenGui.Enabled = false
 end)
 
 -- =========================
 -- LOOP
 -- =========================
 RunService.RenderStepped:Connect(function()
+	if scriptDisabled then return end
+
 	FovCircle.Position = Vector2.new(
 		Camera.ViewportSize.X / 2,
 		Camera.ViewportSize.Y / 2
