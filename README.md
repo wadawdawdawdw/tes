@@ -15,6 +15,7 @@ local Camera = workspace.CurrentCamera
 local aimbotEnabled = false
 local fovEnabled = false
 local ignoreDead = false
+local ignoreTeam = false -- 🔹 NOVO
 local holdingRightClick = false
 local fovRadius = 120
 local lockedTarget = nil
@@ -33,7 +34,7 @@ ScreenGui.Name = "StuartHUB"
 ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame", ScreenGui)
-MainFrame.Size = UDim2.new(0, 320, 0, 470)
+MainFrame.Size = UDim2.new(0, 320, 0, 510)
 MainFrame.Position = UDim2.new(0.35, 0, 0.25, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 MainFrame.Active = true
@@ -79,16 +80,19 @@ local function createButton(text, posY)
 	return btn
 end
 
+-- =========================
 -- BOTÕES
+-- =========================
 local AimBtn       = createButton("AIMBOT [OFF]", 60)
 local FovBtn       = createButton("FOV CHECK [OFF]", 105)
 local PlusBtn      = createButton("AUMENTAR CÍRCULO", 150)
 local MinusBtn     = createButton("DIMINUIR CÍRCULO", 195)
 local DeadBtn      = createButton("IGNORAR MORTOS [OFF]", 240)
-local WeakAimBtn   = createButton("AIMBOT FRACO", 285)
-local StrongAimBtn = createButton("AIMBOT FORTE", 330)
-local HpEspBtn     = createButton("HP ESP [OFF]", 375)
-local BypassBtn    = createButton("BYPASS", 420)
+local TeamBtn      = createButton("IGNORAR TIME [OFF]", 285) -- 🔹 NOVO
+local WeakAimBtn   = createButton("AIMBOT FRACO", 330)
+local StrongAimBtn = createButton("AIMBOT FORTE", 375)
+local HpEspBtn     = createButton("HP ESP [OFF]", 420)
+local BypassBtn    = createButton("BYPASS", 465)
 BypassBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
 
 -- =========================
@@ -112,14 +116,28 @@ end
 local function getClosestPlayer()
 	if scriptDisabled then return nil end
 	local closest, shortest = nil, math.huge
+
 	for _,plr in pairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
-			if ignoreDead and not isAlive(plr) then continue end
+			
+			-- 🔹 IGNORA PLAYER DO MESMO TIME
+			if ignoreTeam and plr.Team == LocalPlayer.Team then
+				continue
+			end
+
+			if ignoreDead and not isAlive(plr) then
+				continue
+			end
+
 			local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.Head.Position)
 			if onScreen then
 				local dist = (Vector2.new(pos.X,pos.Y) -
 					Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)).Magnitude
-				if fovEnabled and dist > fovRadius then continue end
+
+				if fovEnabled and dist > fovRadius then
+					continue
+				end
+
 				if dist < shortest then
 					shortest = dist
 					closest = plr.Character.Head
@@ -131,7 +149,7 @@ local function getClosestPlayer()
 end
 
 -- =========================
--- HP ESP FUNÇÕES
+-- HP ESP
 -- =========================
 local function createHealthBar(player)
 	if player == LocalPlayer or not player.Character then return end
@@ -162,6 +180,7 @@ local function createHealthBar(player)
 	local function update()
 		local hp = hum.Health / hum.MaxHealth
 		bar.Size = UDim2.new(1,0,hp,0)
+
 		if hp > 0.6 then
 			bar.BackgroundColor3 = Color3.fromRGB(0,255,0)
 		elseif hp > 0.3 then
@@ -202,7 +221,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- =========================
--- BOTÕES
+-- BOTÕES (FUNÇÕES)
 -- =========================
 AimBtn.MouseButton1Click:Connect(function()
 	aimbotEnabled = not aimbotEnabled
@@ -228,6 +247,11 @@ DeadBtn.MouseButton1Click:Connect(function()
 	DeadBtn.Text = "IGNORAR MORTOS ["..(ignoreDead and "ON" or "OFF").."]"
 end)
 
+TeamBtn.MouseButton1Click:Connect(function()
+	ignoreTeam = not ignoreTeam
+	TeamBtn.Text = "IGNORAR TIME ["..(ignoreTeam and "ON" or "OFF").."]"
+end)
+
 WeakAimBtn.MouseButton1Click:Connect(function()
 	aimStrength = math.clamp(aimStrength - 0.05, 0.05, 1)
 end)
@@ -239,6 +263,7 @@ end)
 HpEspBtn.MouseButton1Click:Connect(function()
 	hpEspEnabled = not hpEspEnabled
 	HpEspBtn.Text = "HP ESP ["..(hpEspEnabled and "ON" or "OFF").."]"
+
 	if hpEspEnabled then
 		for _,p in pairs(Players:GetPlayers()) do
 			createHealthBar(p)
@@ -260,15 +285,22 @@ end)
 -- =========================
 RunService.RenderStepped:Connect(function()
 	if scriptDisabled then return end
+
 	FovCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
 	FovCircle.Radius = fovRadius
+
 	if aimbotEnabled and holdingRightClick and lockedTarget then
 		local cf = Camera.CFrame
-		Camera.CFrame = cf:Lerp(CFrame.new(cf.Position, lockedTarget.Position), aimStrength)
+		Camera.CFrame = cf:Lerp(
+			CFrame.new(cf.Position, lockedTarget.Position),
+			aimStrength
+		)
 	end
 end)
 
--- Respawn players
+-- =========================
+-- RESPAWN
+-- =========================
 Players.PlayerAdded:Connect(function(p)
 	p.CharacterAdded:Connect(function()
 		task.wait(1)
