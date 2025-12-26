@@ -1,6 +1,8 @@
---// STUART HUB - Aimbot + FOV + ESP Tronco
+--// STUART HUB - Aimbot + FOV + ESP
+--// UI MELHORADA + IMAGEM NO CANTO
 --// LocalScript | StarterPlayer > StarterPlayerScripts
 
+-- SERVICES
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
@@ -16,11 +18,8 @@ local fovEnabled = false
 local ignoreDead = false
 local holdingRightClick = false
 local fovRadius = 120
-local bypass = false
 local lockedTarget = nil
-
--- FORÇA DO AIMBOT
-local aimStrength = 0.15 -- quanto maior, mais forte (0.05 a 1)
+local aimStrength = 0.15
 
 -- ESP
 local espEnabled = false
@@ -29,8 +28,9 @@ local espObjects = {}
 -- =========================
 -- UI
 -- =========================
-local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "StuartHUB"
+ScreenGui.Parent = game.CoreGui
 
 local MainFrame = Instance.new("Frame", ScreenGui)
 MainFrame.Size = UDim2.new(0, 320, 0, 470)
@@ -41,7 +41,19 @@ MainFrame.Draggable = true
 MainFrame.BorderSizePixel = 0
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0,12)
 
--- Título
+-- BORDA NEON
+local Stroke = Instance.new("UIStroke", MainFrame)
+Stroke.Thickness = 2
+Stroke.Color = Color3.fromRGB(0,255,255)
+
+-- LOGO (IMAGEM)
+local Logo = Instance.new("ImageLabel", MainFrame)
+Logo.Size = UDim2.new(0,40,0,40)
+Logo.Position = UDim2.new(0,10,0,5)
+Logo.BackgroundTransparency = 1
+Logo.Image = "rbxassetid://13799217063"
+
+-- TÍTULO
 local Title = Instance.new("TextLabel", MainFrame)
 Title.Size = UDim2.new(1,0,0,50)
 Title.Text = "Stuart HUB"
@@ -58,28 +70,29 @@ local function createButton(text, posY)
 	btn.Size = UDim2.new(0.9,0,0,35)
 	btn.Position = UDim2.new(0.05,0,0,posY)
 	btn.Text = text
-	btn.Font = Enum.Font.Gotham
+	btn.Font = Enum.Font.GothamBold
 	btn.TextSize = 14
 	btn.TextColor3 = Color3.new(1,1,1)
-	btn.BackgroundColor3 = Color3.fromRGB(40,40,40)
+	btn.BackgroundColor3 = Color3.fromRGB(35,35,35)
 	btn.BorderSizePixel = 0
-	Instance.new("UICorner", btn)
+
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+	local s = Instance.new("UIStroke", btn)
+	s.Thickness = 1
+	s.Color = Color3.fromRGB(80,80,80)
+
 	return btn
 end
 
--- =========================
 -- BOTÕES
--- =========================
-local AimBtn      = createButton("AIMBOT [OFF]", 60)
-local FovBtn      = createButton("FOV CHECK [OFF]", 105)
-local PlusBtn     = createButton("AUMENTAR CÍRCULO", 150)
-local MinusBtn    = createButton("DIMINUIR CÍRCULO", 195)
-local DeadBtn     = createButton("IGNORAR MORTOS [OFF]", 240)
-local EspBtn      = createButton("ESP TRONCO [OFF]", 285)
-local WeakAimBtn  = createButton("AIMBOT FRACO", 330)
-local StrongAimBtn= createButton("AIMBOT FORTE", 375)
-local BypassBtn   = createButton("BYPASS", 420)
-BypassBtn.BackgroundColor3 = Color3.fromRGB(120,0,0)
+local AimBtn       = createButton("AIMBOT [OFF]", 60)
+local FovBtn       = createButton("FOV CHECK [OFF]", 105)
+local PlusBtn      = createButton("AUMENTAR CÍRCULO", 150)
+local MinusBtn     = createButton("DIMINUIR CÍRCULO", 195)
+local DeadBtn      = createButton("IGNORAR MORTOS [OFF]", 240)
+local EspBtn       = createButton("ESP TRONCO [OFF]", 285)
+local WeakAimBtn   = createButton("AIMBOT FRACO", 330)
+local StrongAimBtn = createButton("AIMBOT FORTE", 375)
 
 -- =========================
 -- FOV CIRCLE
@@ -95,29 +108,23 @@ FovCircle.Visible = false
 -- FUNÇÕES AIMBOT
 -- =========================
 local function isAlive(player)
-	if not player.Character then return false end
-	local hum = player.Character:FindFirstChild("Humanoid")
+	local hum = player.Character and player.Character:FindFirstChild("Humanoid")
 	return hum and hum.Health > 0
 end
 
 local function getClosestPlayer()
 	local closest, shortest = nil, math.huge
-
 	for _,plr in pairs(Players:GetPlayers()) do
 		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
 			if ignoreDead and not isAlive(plr) then continue end
-
-			local head = plr.Character.Head
-			local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+			local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.Head.Position)
 			if onScreen then
 				local dist = (Vector2.new(pos.X,pos.Y) -
 					Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)).Magnitude
-
 				if fovEnabled and dist > fovRadius then continue end
-
 				if dist < shortest then
 					shortest = dist
-					closest = head
+					closest = plr.Character.Head
 				end
 			end
 		end
@@ -128,12 +135,18 @@ end
 -- =========================
 -- ESP
 -- =========================
-local function createESP(player)
-	if player == LocalPlayer then return end
-	if not player.Character then return end
+local function clearESP(player)
+	if espObjects[player] then
+		espObjects[player]:Destroy()
+		espObjects[player] = nil
+	end
+end
 
-	local hrp = player.Character:FindFirstChild("HumanoidRootPart")
-	if not hrp or espObjects[player] then return end
+local function applyESP(player)
+	if not espEnabled or player == LocalPlayer then return end
+	local hrp = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	clearESP(player)
 
 	local box = Instance.new("BoxHandleAdornment")
 	box.Adornee = hrp
@@ -141,30 +154,10 @@ local function createESP(player)
 	box.Color3 = Color3.fromRGB(255,0,0)
 	box.Transparency = 0.3
 	box.AlwaysOnTop = true
-	box.ZIndex = 10
 	box.Parent = hrp
 
 	espObjects[player] = box
 end
-
-local function removeESP(player)
-	if espObjects[player] then
-		espObjects[player]:Destroy()
-		espObjects[player] = nil
-	end
-end
-
-local function updateESP()
-	for _,plr in pairs(Players:GetPlayers()) do
-		if espEnabled then
-			createESP(plr)
-		else
-			removeESP(plr)
-		end
-	end
-end
-
-Players.PlayerRemoving:Connect(removeESP)
 
 -- =========================
 -- INPUT
@@ -184,7 +177,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 -- =========================
--- BOTÕES LÓGICA
+-- BOTÕES
 -- =========================
 AimBtn.MouseButton1Click:Connect(function()
 	aimbotEnabled = not aimbotEnabled
@@ -212,37 +205,24 @@ end)
 
 EspBtn.MouseButton1Click:Connect(function()
 	espEnabled = not espEnabled
-	EspBtn.Text = "ESP TRONCO [" .. (espEnabled and "ON" or "OFF") .. "]"
-	updateESP()
+	EspBtn.Text = "ESP TRONCO ["..(espEnabled and "ON" or "OFF").."]"
+	for _,plr in pairs(Players:GetPlayers()) do
+		if espEnabled then applyESP(plr) else clearESP(plr) end
+	end
 end)
 
--- Aimbot fraco
 WeakAimBtn.MouseButton1Click:Connect(function()
 	aimStrength = math.clamp(aimStrength - 0.05, 0.05, 1)
 end)
 
--- Aimbot forte
 StrongAimBtn.MouseButton1Click:Connect(function()
 	aimStrength = math.clamp(aimStrength + 0.05, 0.05, 1)
-end)
-
-BypassBtn.MouseButton1Click:Connect(function()
-	bypass = true
-	ScreenGui.Enabled = false
-	FovCircle.Visible = false
-	aimbotEnabled = false
-	fovEnabled = false
-	espEnabled = false
-	lockedTarget = nil
-	updateESP()
 end)
 
 -- =========================
 -- LOOP
 -- =========================
 RunService.RenderStepped:Connect(function()
-	if bypass then return end
-
 	FovCircle.Position = Vector2.new(
 		Camera.ViewportSize.X / 2,
 		Camera.ViewportSize.Y / 2
@@ -250,8 +230,10 @@ RunService.RenderStepped:Connect(function()
 	FovCircle.Radius = fovRadius
 
 	if aimbotEnabled and holdingRightClick and lockedTarget then
-		local currentCF = Camera.CFrame
-		local targetCF = CFrame.new(currentCF.Position, lockedTarget.Position)
-		Camera.CFrame = currentCF:Lerp(targetCF, aimStrength)
+		local cf = Camera.CFrame
+		Camera.CFrame = cf:Lerp(
+			CFrame.new(cf.Position, lockedTarget.Position),
+			aimStrength
+		)
 	end
 end)
